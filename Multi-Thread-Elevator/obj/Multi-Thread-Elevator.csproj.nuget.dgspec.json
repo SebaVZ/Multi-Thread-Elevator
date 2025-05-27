@@ -1,0 +1,72 @@
+{
+  "format": 1,
+  "restore": {
+    "D:\\Universidad\\I CICLO 2025\\Sistemas Operativos\\Tareas\\Multi-Thread-Elevator\\Multi-Thread-Elevator\\Multi-Thread-Elevator.csproj": {}
+  },
+  "projects": {
+    "D:\\Universidad\\I CICLO 2025\\Sistemas Operativos\\Tareas\\Multi-Thread-Elevator\\Multi-Thread-Elevator\\Multi-Thread-Elevator.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "D:\\Universidad\\I CICLO 2025\\Sistemas Operativos\\Tareas\\Multi-Thread-Elevator\\Multi-Thread-Elevator\\Multi-Thread-Elevator.csproj",
+        "projectName": "Multi-Thread-Elevator",
+        "projectPath": "D:\\Universidad\\I CICLO 2025\\Sistemas Operativos\\Tareas\\Multi-Thread-Elevator\\Multi-Thread-Elevator\\Multi-Thread-Elevator.csproj",
+        "packagesPath": "C:\\Users\\herne\\.nuget\\packages\\",
+        "outputPath": "D:\\Universidad\\I CICLO 2025\\Sistemas Operativos\\Tareas\\Multi-Thread-Elevator\\Multi-Thread-Elevator\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\herne\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0-windows"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0-windows7.0": {
+            "targetAlias": "net8.0-windows",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            },
+            "Microsoft.WindowsDesktop.App.WindowsForms": {
+              "privateAssets": "none"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.300/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
