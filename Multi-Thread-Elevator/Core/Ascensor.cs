@@ -132,4 +132,16 @@ public class Ascensor
     {
         return $"Piso: {PisoActual} | Pendientes: {string.Join(", ", SolicitudesPendientes.Select(s => s.PisoDestino))}";
     }
+
+    public void SolicitarIrAPiso(int piso)
+    {
+        if (piso != PisoActual && piso >= 0 && piso < 10)
+        {
+            AgregarSolicitud(new Solicitud
+            {
+                PisoDestino = piso,
+                Tipo = TipoSolicitud.Normal
+            });
+        }
+    }
 }

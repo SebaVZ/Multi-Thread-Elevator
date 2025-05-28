@@ -75,45 +75,43 @@ namespace Multi_Thread_Elevator
                     char letraAscensor = (char)('A' + j);
                     ascensor.Identificador = letraAscensor.ToString();
 
-                    var caja = new Panel
+                    var caja = new FlowLayoutPanel
                     {
                         Width = 100,
-                        Height = 60,
+                        Height = 120,
                         BackColor = Color.DimGray,
                         Margin = new Padding(4),
-                        BorderStyle = BorderStyle.FixedSingle
+                        BorderStyle = BorderStyle.FixedSingle,
+                        FlowDirection = FlowDirection.TopDown,
+                        WrapContents = false
                     };
 
-                    var estado = new Label { Dock = DockStyle.Bottom, Height = 30, ForeColor = Color.White, TextAlign = ContentAlignment.MiddleCenter };
-                    caja.Controls.Add(estado);
-                    ascensor.EstadoLabel = estado;
-
-                    var labelId = new Label { Text = $"Asc. {letraAscensor}", ForeColor = Color.White, Dock = DockStyle.Top, Height = 15 };
+                    var labelId = new Label { Text = $"Asc. {letraAscensor}", ForeColor = Color.White, Height = 15, AutoSize = true };
                     var comboDestino = new ComboBox { Width = 90, DropDownStyle = ComboBoxStyle.DropDownList };
                     var botonAzotea = new Button { Text = "Azotea", Width = 90, Height = 22 };
                     var botonPB = new Button { Text = "Planta Baja", Width = 90, Height = 22 };
                     var botonAbrir = new Button { Text = "Abrir", Width = 90, Height = 22 };
+                    var labelPiso = new Label { Text = "Piso: 0", ForeColor = Color.Yellow, AutoSize = true };
+
+                    int ultimoPisoSeleccionado = -1;
 
                     comboDestino.SelectedIndexChanged += (s, e) =>
                     {
-                        if (comboDestino.SelectedIndex >= 0 && !ascensor.EnMovimiento)
+                        if (comboDestino.DroppedDown) return; // Evita ejecutar si el usuario está interactuando
+
+                        if (comboDestino.SelectedItem != null &&
+                            int.TryParse(comboDestino.SelectedItem.ToString(), out int destino) &&
+                            destino != ascensor.PisoActual &&
+                            destino != ultimoPisoSeleccionado)
                         {
-                            ascensor.AgregarSolicitud(new Solicitud
-                            {
-                                PisoDestino = comboDestino.SelectedIndex,
-                                Tipo = TipoSolicitud.Normal
-                            });
+                            ultimoPisoSeleccionado = destino;
+                            ascensor.SolicitarIrAPiso(destino);
                         }
                     };
 
-                    botonAzotea.Click += (s, e) =>
-                    {
-                        ascensor.AgregarSolicitud(new Solicitud { PisoDestino = CANTIDAD_PISOS - 1, Tipo = TipoSolicitud.Normal });
-                    };
-                    botonPB.Click += (s, e) =>
-                    {
-                        ascensor.AgregarSolicitud(new Solicitud { PisoDestino = 0, Tipo = TipoSolicitud.Normal });
-                    };
+                    botonAzotea.Click += (s, e) => ascensor.SolicitarIrAPiso(CANTIDAD_PISOS - 1);
+                    botonPB.Click += (s, e) => ascensor.SolicitarIrAPiso(0);
+
                     botonAbrir.Click += (s, e) =>
                     {
                         if (!sistemaPausado && !ascensor.EnMovimiento)
@@ -125,6 +123,7 @@ namespace Multi_Thread_Elevator
                     };
 
                     caja.Controls.Add(labelId);
+                    caja.Controls.Add(labelPiso);
                     caja.Controls.Add(comboDestino);
                     caja.Controls.Add(botonAzotea);
                     caja.Controls.Add(botonPB);
@@ -134,25 +133,55 @@ namespace Multi_Thread_Elevator
 
                     ascensor.ActualizarGUI = async () =>
                     {
-                        await InvokeAsync(async () =>
+                        await InvokeAsync(() =>
                         {
                             botonAzotea.Visible = ascensor.PisoActual != CANTIDAD_PISOS - 1;
                             botonPB.Visible = ascensor.PisoActual != 0;
+                            labelPiso.Text = $"Piso: {ascensor.PisoActual}";
 
-                            var pisos = ascensor.ObtenerPisosDisponibles();
+                            var pisos = Enumerable.Range(0, CANTIDAD_PISOS).ToList();
+
                             comboDestino.BeginUpdate();
+                            var seleccionActual = comboDestino.SelectedItem?.ToString();
                             comboDestino.Items.Clear();
                             foreach (var piso in pisos)
                                 comboDestino.Items.Add(piso.ToString());
 
+                            if (seleccionActual != null && comboDestino.Items.Contains(seleccionActual))
+                                comboDestino.SelectedItem = seleccionActual;
+                            else if (comboDestino.Items.Count > 0)
+                                comboDestino.SelectedItem = comboDestino.Items[0];
                             comboDestino.EndUpdate();
+
                             if (comboDestino.Items.Count > 0)
                                 comboDestino.SelectedIndex = 0;
 
-                            ascensor.EstadoLabel.Text = ascensor.ObtenerEstadoActual();
+                            // Mover visualmente el ascensor al nuevo piso
+                            for (int fila = 0; fila < layoutPisos.RowCount; fila++)
+                            {
+                                var panelPiso = layoutPisos.GetControlFromPosition(0, fila) as Panel;
+                                if (panelPiso?.Controls.Count > 0)
+                                {
+                                    var contenedor = panelPiso.Controls[0];
+                                    if (contenedor.Controls.Contains(caja))
+                                    {
+                                        contenedor.Controls.Remove(caja);
+                                        break;
+                                    }
+                                }
+                            }
 
+                            int targetRow = CANTIDAD_PISOS - 1 - ascensor.PisoActual;
+                            var panelObjetivo = layoutPisos.GetControlFromPosition(0, targetRow) as Panel;
+                            if (panelObjetivo?.Controls.Count > 0)
+                            {
+                                var contenedor = panelObjetivo.Controls[0];
+                                contenedor.Controls.Add(caja);
+                            }
                         });
                     };
+
+                    ascensor.Iniciar();
                 }
 
                 for (int piso = 0; piso < CANTIDAD_PISOS; piso++)
@@ -189,7 +218,6 @@ namespace Multi_Thread_Elevator
             }
 
             CrearPanelesDeControl();
-            IniciarSistema();
         }
 
         private void CrearPanelesDeControl()
