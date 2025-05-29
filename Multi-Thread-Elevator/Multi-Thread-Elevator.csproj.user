@@ -4,6 +4,9 @@
     <Compile Update="Components\PanelDeControl.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Update="Components\PanelDeControlUniversal.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Update="FormAscensores.cs">
       <SubType>Form</SubType>
     </Compile>

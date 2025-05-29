@@ -21,11 +21,14 @@ namespace Multi_Thread_Elevator
         private bool sistemaPausado = false;
         private Button btnPausar;
         private Button btnReanudar;
+        private TableLayoutPanel layoutPrincipal;
 
         public FormAscensores(int cantidadEdificios, int ascensoresPorEdificio)
         {
             this.cantidadEdificios = cantidadEdificios;
             this.ascensoresPorEdificio = ascensoresPorEdificio;
+
+            Ascensor.InicializarSemaforos(cantidadEdificios);
 
             InitializeComponent();
 
@@ -71,6 +74,7 @@ namespace Multi_Thread_Elevator
                 {
                     var ascensor = new Ascensor(j);
                     edificio.Ascensores.Add(ascensor);
+                    ascensor.EdificioId = i;
 
                     char letraAscensor = (char)('A' + j);
                     ascensor.Identificador = letraAscensor.ToString();
@@ -216,6 +220,31 @@ namespace Multi_Thread_Elevator
                 layoutEdificios.Controls.Add(panelEdificio, i, 0);
                 edificios.Add(edificio);
             }
+            var panelNumerosPiso = new TableLayoutPanel
+            {
+                Dock = DockStyle.Left, // cambia a DockStyle.Right si los quieres al otro lado
+                Width = 50,
+                RowCount = CANTIDAD_PISOS,
+                ColumnCount = 1,
+                BackColor = Color.WhiteSmoke,
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.None,
+                Padding = new Padding(5)
+            };
+
+            for (int r = 0; r < CANTIDAD_PISOS; r++)
+            {
+                panelNumerosPiso.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / CANTIDAD_PISOS));
+                var label = new Label
+                {
+                    Text = $"Piso {CANTIDAD_PISOS - 1 - r}", // para que el 9 quede arriba y el 0 abajo
+                    Dock = DockStyle.Fill,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Font = new Font("Segoe UI", 9, FontStyle.Bold)
+                };
+                panelNumerosPiso.Controls.Add(label, 0, r);
+            }
+
+            Controls.Add(panelNumerosPiso);
 
             CrearPanelesDeControl();
         }
@@ -225,39 +254,24 @@ namespace Multi_Thread_Elevator
             var panel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Left,
-                Width = 200,
+                Width = 220,
                 AutoScroll = true,
                 Padding = new Padding(10),
                 BackColor = Color.LightSlateGray
             };
 
-            for (int piso = 0; piso < CANTIDAD_PISOS; piso++)
+            var panelUniversal = new PanelDeControlUniversal(cantidadEdificios, ascensoresPorEdificio, CANTIDAD_PISOS);
+            panelUniversal.SolicitudUniversalGenerada += (edificioIdx, ascensorIdx, pisoOrigen, solicitud) =>
             {
-                var control = new PanelDeControl(piso)
-                {
-                    Width = 160,
-                    Height = 60,
-                    BackColor = Color.WhiteSmoke,
-                    Margin = new Padding(4)
-                };
-                control.SolicitudGenerada += (destino, tipo) =>
-                {
-                    var ascensor = edificios
-                        .SelectMany(e => e.Ascensores)
-                        .OrderBy(_ => Guid.NewGuid())
-                        .First();
+                var ascensor = edificios[edificioIdx].Ascensores[ascensorIdx];
+                ascensor.AgregarSolicitud(solicitud);
+                MessageBox.Show($"Solicitud enviada desde el piso {pisoOrigen} al {solicitud.PisoDestino}, tipo {solicitud.Tipo}");
+            };
 
-                    ascensor.AgregarSolicitud(new Solicitud
-                    {
-                        PisoDestino = destino,
-                        Tipo = tipo
-                    });
-                };
-                panel.Controls.Add(control);
-            }
-
+            panel.Controls.Add(panelUniversal);
             Controls.Add(panel);
         }
+
 
         private void AgregarControlesGlobales()
         {
@@ -291,6 +305,39 @@ namespace Multi_Thread_Elevator
                 IniciarSistema();
                 sistemaPausado = false;
             };
+            var velocidadLabel = new Label
+            {
+                Text = "Velocidad:",
+                Width = 70,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(10, 10, 0, 0)
+            };
+
+            var velocidadSlider = new TrackBar
+            {
+                Minimum = 100,
+                Maximum = 2000,
+                TickFrequency = 100,
+                Value = Ascensor.VelocidadMovimientoMs,
+                Width = 200,
+                SmallChange = 100,
+                LargeChange = 200,
+                Margin = new Padding(0, 10, 0, 0)
+            };
+
+            var valorVelocidad = new Label
+            {
+                Text = $"{Ascensor.VelocidadMovimientoMs} ms",
+                Width = 60,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Margin = new Padding(10, 10, 0, 0)
+            };
+
+            velocidadSlider.Scroll += (s, e) =>
+            {
+                Ascensor.VelocidadMovimientoMs = velocidadSlider.Value;
+                valorVelocidad.Text = $"{velocidadSlider.Value} ms";
+            };
 
             var topPanel = new FlowLayoutPanel
             {
@@ -301,6 +348,9 @@ namespace Multi_Thread_Elevator
             };
             topPanel.Controls.Add(btnPausar);
             topPanel.Controls.Add(btnReanudar);
+            topPanel.Controls.Add(velocidadLabel);
+            topPanel.Controls.Add(velocidadSlider);
+            topPanel.Controls.Add(valorVelocidad);
 
             Controls.Add(topPanel);
         }
