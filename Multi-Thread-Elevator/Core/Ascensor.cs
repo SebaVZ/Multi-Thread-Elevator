@@ -17,7 +17,6 @@ public class Ascensor
     public Label EstadoLabel { get; set; } // Label para mostrar estado visual
 
     private readonly List<Solicitud> solicitudes = new();
-    private readonly SemaphoreSlim semaforoEspecial = new(1, 1);
     private CancellationTokenSource cts;
     private Task tareaAscensor;
     private bool estaEnEjecucion = false;
@@ -25,6 +24,8 @@ public class Ascensor
     public int EdificioId { get; set; }
 
     private static Dictionary<int, SemaphoreSlim> semaforosEdificioEspecial = new();
+    public bool PuertaAbierta { get; private set; } = false;
+
     public static void InicializarSemaforos(int cantidadEdificios)
     {
         semaforosEdificioEspecial.Clear();
@@ -53,7 +54,10 @@ public class Ascensor
 
     public void Iniciar()
     {
-        if (estaEnEjecucion) return;
+        if (estaEnEjecucion)
+        {
+            return;
+        }
 
         cts = new CancellationTokenSource();
         tareaAscensor = Task.Run(() => Ejecutar(cts.Token));
@@ -65,6 +69,7 @@ public class Ascensor
         if (!estaEnEjecucion) return;
 
         cts?.Cancel();
+        estaEnEjecucion = false;
     }
 
     private async Task Ejecutar(CancellationToken token)
@@ -98,7 +103,7 @@ public class Ascensor
                         if (solicitudes.Count > 0)
                         {
                             solicitud = solicitudes[0];
-                            solicitudes.RemoveAt(0);
+                            //solicitudes.RemoveAt(0);
                         }
                     }
                 }
@@ -112,7 +117,7 @@ public class Ascensor
                         try
                         {
                             EjecutandoEspecial = true;
-                            await MoverAlPiso(solicitud.PisoDestino, token);
+                            await MoverAlPiso(solicitud, token);
                             EjecutandoEspecial = false;
                         }
                         finally
@@ -122,7 +127,7 @@ public class Ascensor
                     }
                     else
                     {
-                        await MoverAlPiso(solicitud.PisoDestino, token);
+                        await MoverAlPiso(solicitud, token);
                     }
                 }
 
@@ -137,17 +142,27 @@ public class Ascensor
     }
 
 
-    private async Task MoverAlPiso(int piso, CancellationToken token)
+    private async Task MoverAlPiso(Solicitud solicitud, CancellationToken token)
     {
         EnMovimiento = true;
-        while (PisoActual != piso && !token.IsCancellationRequested)
+
+        int destino = solicitud.PisoDestino;
+
+        while (PisoActual != destino && !token.IsCancellationRequested)
         {
-            PisoActual += PisoActual < piso ? 1 : -1;
+            PisoActual += PisoActual < destino ? 1 : -1;
             ActualizarGUI?.Invoke();
             await Task.Delay(VelocidadMovimientoMs, token);
         }
+
         EnMovimiento = false;
         ActualizarGUI?.Invoke();
+
+        lock (solicitudes)
+        {
+            solicitudes.Remove(solicitud);
+        }
+
     }
 
     public List<int> ObtenerPisosDisponibles()
@@ -167,8 +182,9 @@ public class Ascensor
 
     public void SolicitarIrAPiso(int piso)
     {
-        if (piso != PisoActual && piso >= 0 && piso < 10)
+        if (piso >= 0 && piso < 8)
         {
+            if (piso == PisoActual) return;
             AgregarSolicitud(new Solicitud
             {
                 PisoDestino = piso,
@@ -176,4 +192,13 @@ public class Ascensor
             });
         }
     }
+
+    public void AlternarPuerta()
+    {
+        if (EnMovimiento) return;
+
+        PuertaAbierta = !PuertaAbierta;
+        ActualizarGUI?.Invoke();
+    }
+
 }

@@ -1,5 +1,4 @@
-﻿// Actualización completa: manejo de solicitudes optimizado, ComboBox para pisos, ocultamiento dinámico de botones, y asignación con identificación de ascensores
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -16,12 +15,13 @@ namespace Multi_Thread_Elevator
         private readonly int ascensoresPorEdificio;
         private readonly List<Edificio> edificios = new();
         private readonly TableLayoutPanel layoutEdificios;
-        private const int CANTIDAD_PISOS = 10;
+        private const int CANTIDAD_PISOS = 8;
 
         private bool sistemaPausado = false;
         private Button btnPausar;
         private Button btnReanudar;
         private TableLayoutPanel layoutPrincipal;
+
 
         public FormAscensores(int cantidadEdificios, int ascensoresPorEdificio)
         {
@@ -76,13 +76,13 @@ namespace Multi_Thread_Elevator
                     edificio.Ascensores.Add(ascensor);
                     ascensor.EdificioId = i;
 
-                    char letraAscensor = (char)('A' + j);
+                    int letraAscensor = (j);
                     ascensor.Identificador = letraAscensor.ToString();
 
                     var caja = new FlowLayoutPanel
                     {
                         Width = 100,
-                        Height = 120,
+                        Height = 80,
                         BackColor = Color.DimGray,
                         Margin = new Padding(4),
                         BorderStyle = BorderStyle.FixedSingle,
@@ -92,16 +92,49 @@ namespace Multi_Thread_Elevator
 
                     var labelId = new Label { Text = $"Asc. {letraAscensor}", ForeColor = Color.White, Height = 15, AutoSize = true };
                     var comboDestino = new ComboBox { Width = 90, DropDownStyle = ComboBoxStyle.DropDownList };
-                    var botonAzotea = new Button { Text = "Azotea", Width = 90, Height = 22 };
-                    var botonPB = new Button { Text = "Planta Baja", Width = 90, Height = 22 };
-                    var botonAbrir = new Button { Text = "Abrir", Width = 90, Height = 22 };
-                    var labelPiso = new Label { Text = "Piso: 0", ForeColor = Color.Yellow, AutoSize = true };
+
+                    var btnSubir = new Button
+                    {
+                        Text = "↑",
+                        Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                        Width = 42,
+                        Height = 26,
+                        Margin = new Padding(2)
+                    };
+
+                    var btnBajar = new Button
+                    {
+                        Text = "↓",
+                        Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                        Width = 42,
+                        Height = 26,
+                        Margin = new Padding(2)
+                    };
+
+                    var btnAbrir = new Button
+                    {
+                        Text = "Abrir",
+                        Width = 30,
+                        Height = 24,
+                        Margin = new Padding(2)
+                    };
+                    //var labelPiso = new Label { Text = "Piso: 0", ForeColor = Color.Yellow, AutoSize = true };
+                    var labelSolicitudes = new Label
+                    {
+                        Text = "P: -",
+                        ForeColor = Color.LightCyan,
+                        Font = new Font("Segoe UI", 7, FontStyle.Regular),
+                        AutoSize = true
+                    };
 
                     int ultimoPisoSeleccionado = -1;
 
+                    for (int piso = 0; piso < CANTIDAD_PISOS; piso++)
+                        comboDestino.Items.Add(piso.ToString());
+
                     comboDestino.SelectedIndexChanged += (s, e) =>
                     {
-                        if (comboDestino.DroppedDown) return; // Evita ejecutar si el usuario está interactuando
+                        if (comboDestino.DroppedDown) return;
 
                         if (comboDestino.SelectedItem != null &&
                             int.TryParse(comboDestino.SelectedItem.ToString(), out int destino) &&
@@ -113,25 +146,36 @@ namespace Multi_Thread_Elevator
                         }
                     };
 
-                    botonAzotea.Click += (s, e) => ascensor.SolicitarIrAPiso(CANTIDAD_PISOS - 1);
-                    botonPB.Click += (s, e) => ascensor.SolicitarIrAPiso(0);
+                    btnSubir.Click += (s, e) => ascensor.SolicitarIrAPiso(CANTIDAD_PISOS - 1);
 
-                    botonAbrir.Click += (s, e) =>
+                    btnBajar.Click += (s, e) => ascensor.SolicitarIrAPiso(0);
+
+                    btnAbrir.Click += (s, e) =>
                     {
-                        if (!sistemaPausado && !ascensor.EnMovimiento)
-                        {
-                            botonAbrir.BackColor = Color.LightGreen;
-                            MessageBox.Show($"Ascensor {ascensor.Id} abre puerta en piso {ascensor.PisoActual}");
-                            Task.Delay(1000).ContinueWith(_ => Invoke(() => botonAbrir.BackColor = Color.LightGray));
-                        }
+                        if (sistemaPausado || ascensor.EnMovimiento) return;
+
+                        ascensor.AlternarPuerta();
                     };
 
                     caja.Controls.Add(labelId);
-                    caja.Controls.Add(labelPiso);
+                    //caja.Controls.Add(labelPiso);
                     caja.Controls.Add(comboDestino);
-                    caja.Controls.Add(botonAzotea);
-                    caja.Controls.Add(botonPB);
-                    caja.Controls.Add(botonAbrir);
+
+                    var panelControles = new FlowLayoutPanel
+                    {
+                        FlowDirection = FlowDirection.LeftToRight,
+                        AutoSize = true,
+                        WrapContents = false,
+                        Margin = new Padding(0)
+                    };
+
+                    panelControles.Controls.Add(btnSubir);
+                    panelControles.Controls.Add(btnBajar);
+                    panelControles.Controls.Add(btnAbrir);
+                    caja.Controls.Add(labelSolicitudes);
+
+                    // Finalmente agrega al contenedor principal:
+                    caja.Controls.Add(panelControles);
 
                     cajasAscensores.Add(caja);
 
@@ -139,10 +183,11 @@ namespace Multi_Thread_Elevator
                     {
                         await InvokeAsync(() =>
                         {
-                            botonAzotea.Visible = ascensor.PisoActual != CANTIDAD_PISOS - 1;
-                            botonPB.Visible = ascensor.PisoActual != 0;
-                            labelPiso.Text = $"Piso: {ascensor.PisoActual}";
-
+                            btnSubir.Visible = ascensor.PisoActual != CANTIDAD_PISOS - 1;
+                            btnBajar.Visible = ascensor.PisoActual != 0;
+                            //labelPiso.Text = $"Piso: {ascensor.PisoActual}";
+                            btnAbrir.Text = ascensor.PuertaAbierta ? "Cerrar" : "Abrir";
+                            btnAbrir.BackColor = ascensor.PuertaAbierta ? Color.LightGreen : SystemColors.Control;
                             var pisos = Enumerable.Range(0, CANTIDAD_PISOS).ToList();
 
                             comboDestino.BeginUpdate();
@@ -153,12 +198,22 @@ namespace Multi_Thread_Elevator
 
                             if (seleccionActual != null && comboDestino.Items.Contains(seleccionActual))
                                 comboDestino.SelectedItem = seleccionActual;
-                            else if (comboDestino.Items.Count > 0)
-                                comboDestino.SelectedItem = comboDestino.Items[0];
+                            //else if (comboDestino.Items.Count > 0)
+                                //comboDestino.SelectedItem = comboDestino.Items[0];
                             comboDestino.EndUpdate();
 
-                            if (comboDestino.Items.Count > 0)
-                                comboDestino.SelectedIndex = 0;
+                            //if (comboDestino.Items.Count > 0)
+                                //comboDestino.SelectedIndex = 0;
+
+                            //Label provisional para ver solicitudes pendientes
+                            var pendientes = ascensor.SolicitudesPendientes
+                                .Select(s => s.PisoDestino.ToString())
+                                .ToArray();
+
+                            labelSolicitudes.Text = pendientes.Length > 0
+                                ? $"P: {string.Join(", ", pendientes)}"
+                                : "P: -";
+
 
                             // Mover visualmente el ascensor al nuevo piso
                             for (int fila = 0; fila < layoutPisos.RowCount; fila++)
@@ -190,14 +245,6 @@ namespace Multi_Thread_Elevator
 
                 for (int piso = 0; piso < CANTIDAD_PISOS; piso++)
                 {
-                    var pisoContainer = new Panel
-                    {
-                        BackColor = Color.White,
-                        Dock = DockStyle.Fill,
-                        Margin = new Padding(2),
-                        BorderStyle = BorderStyle.FixedSingle
-                    };
-
                     var filaAscensores = new FlowLayoutPanel
                     {
                         Dock = DockStyle.Fill,
@@ -212,6 +259,31 @@ namespace Multi_Thread_Elevator
                             filaAscensores.Controls.Add(cajasAscensores[j]);
                     }
 
+                    var pisoContainer = new Panel
+                    {
+                        BackColor = Color.White,
+                        Dock = DockStyle.Fill,
+                        Margin = new Padding(2),
+                        BorderStyle = BorderStyle.FixedSingle
+                    };
+
+                    // Agregar evento Paint para dibujar el número como fondo
+                    int numeroActual = CANTIDAD_PISOS - 1 - piso;
+                    pisoContainer.Paint += (sender, e) =>
+                    {
+                        var g = e.Graphics;
+                        using var font = new Font("Segoe UI", 32, FontStyle.Bold, GraphicsUnit.Pixel);
+                        var text = numeroActual.ToString();
+                        var size = g.MeasureString(text, font);
+                        var pos = new PointF(
+                            (pisoContainer.Width - size.Width) / 2,
+                            (pisoContainer.Height - size.Height) / 2
+                        );
+                        var color = Color.FromArgb(30, 0, 0, 0); // muy tenue
+                        using var brush = new SolidBrush(color);
+                        g.DrawString(text, font, brush, pos);
+                    };
+
                     pisoContainer.Controls.Add(filaAscensores);
                     layoutPisos.Controls.Add(pisoContainer, 0, piso);
                 }
@@ -220,31 +292,7 @@ namespace Multi_Thread_Elevator
                 layoutEdificios.Controls.Add(panelEdificio, i, 0);
                 edificios.Add(edificio);
             }
-            var panelNumerosPiso = new TableLayoutPanel
-            {
-                Dock = DockStyle.Left, // cambia a DockStyle.Right si los quieres al otro lado
-                Width = 50,
-                RowCount = CANTIDAD_PISOS,
-                ColumnCount = 1,
-                BackColor = Color.WhiteSmoke,
-                CellBorderStyle = TableLayoutPanelCellBorderStyle.None,
-                Padding = new Padding(5)
-            };
 
-            for (int r = 0; r < CANTIDAD_PISOS; r++)
-            {
-                panelNumerosPiso.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / CANTIDAD_PISOS));
-                var label = new Label
-                {
-                    Text = $"Piso {CANTIDAD_PISOS - 1 - r}", // para que el 9 quede arriba y el 0 abajo
-                    Dock = DockStyle.Fill,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Font = new Font("Segoe UI", 9, FontStyle.Bold)
-                };
-                panelNumerosPiso.Controls.Add(label, 0, r);
-            }
-
-            Controls.Add(panelNumerosPiso);
 
             CrearPanelesDeControl();
         }
