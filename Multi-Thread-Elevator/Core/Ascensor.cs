@@ -145,13 +145,25 @@ public class Ascensor
     private async Task MoverAlPiso(Solicitud solicitud, CancellationToken token)
     {
         EnMovimiento = true;
+        ActualizarGUI?.Invoke();
 
         int destino = solicitud.PisoDestino;
 
+        // ÚNICO bucle principal
         while (PisoActual != destino && !token.IsCancellationRequested)
         {
+            // 1) Si la puerta está abierta, esperamos aquí hasta que se cierre:
+            if (PuertaAbierta)
+            {
+                await Task.Delay(200, token);
+                continue;
+            }
+
+            // 2) Puerta cerrada: avanzamos un piso
             PisoActual += PisoActual < destino ? 1 : -1;
             ActualizarGUI?.Invoke();
+
+            // 3) Pausa entre pisos
             await Task.Delay(VelocidadMovimientoMs, token);
         }
 
@@ -162,8 +174,8 @@ public class Ascensor
         {
             solicitudes.Remove(solicitud);
         }
-
     }
+
 
     public List<int> ObtenerPisosDisponibles()
     {
