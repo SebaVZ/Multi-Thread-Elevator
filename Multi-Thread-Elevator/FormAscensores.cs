@@ -22,34 +22,88 @@ namespace Multi_Thread_Elevator
         private Button btnReanudar;
         private TableLayoutPanel layoutPrincipal;
 
-
         public FormAscensores(int cantidadEdificios, int ascensoresPorEdificio)
         {
+            InitializeComponent();
+            this.WindowState = FormWindowState.Maximized;
             this.cantidadEdificios = cantidadEdificios;
             this.ascensoresPorEdificio = ascensoresPorEdificio;
-
             Ascensor.InicializarSemaforos(cantidadEdificios);
 
-            InitializeComponent();
+            // 2) Creo el scrollPanel y lo añado de fondo:
+            var scrollPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                BackColor = Color.LightGray
+            };
+            Controls.Add(scrollPanel);
 
+            // 3) Dentro, el layout que crece horizontalmente:
+            layoutEdificios = new TableLayoutPanel
+            {
+                //AutoSize = true,
+                //AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Dock = DockStyle.Fill,        // <-- NO Fill
+                ColumnCount = cantidadEdificios,
+                RowCount = 1,
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.Single,
+                BackColor = Color.Transparent
+            };
+            scrollPanel.Controls.Add(layoutEdificios);
+
+            // 4) Columnas fijas de 300px
+            for (int i = 0; i < cantidadEdificios; i++)
+                layoutEdificios.ColumnStyles.Add(
+                    new ColumnStyle(SizeType.Absolute, 300f)
+                );
+            AgregarControlesGlobales();
+            // 5) Finalmente cargo los edificios
+            InicializarSistema();
+        }
+
+
+        /*public FormAscensores(int cantidadEdificios, int ascensoresPorEdificio)
+        {
+            InitializeComponent();
+            this.WindowState = FormWindowState.Maximized;
+            this.cantidadEdificios = cantidadEdificios;
+            this.ascensoresPorEdificio = ascensoresPorEdificio;
+            Ascensor.InicializarSemaforos(cantidadEdificios);
+
+            // 1) Creamos y añadimos primero el scrollPanel (queda detrás de todo)
+            var scrollPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                BackColor = Color.LightGray
+            };
+            Controls.Add(scrollPanel);
+
+            // 2) Dentro, la tabla de edificios
             layoutEdificios = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = cantidadEdificios,
                 RowCount = 1,
-                BackColor = Color.LightGray,
-                CellBorderStyle = TableLayoutPanelCellBorderStyle.Single
+                CellBorderStyle = TableLayoutPanelCellBorderStyle.Single,
+                BackColor = Color.Transparent
             };
+            scrollPanel.Controls.Add(layoutEdificios);
 
             for (int i = 0; i < cantidadEdificios; i++)
-                layoutEdificios.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / cantidadEdificios));
+                layoutEdificios.ColumnStyles.Add(
+                    new ColumnStyle(SizeType.Absolute, 300f)
+                );
 
-            Controls.Add(layoutEdificios);
+            // 3) Ahora sí agregamos los controles fijos **por encima** del scrollPanel:
+            AgregarControlesGlobales();    // topPanel.Dock = Top
+            //CrearPanelesDeControl();       // panelUniversal.Dock = Left
 
+            // 4) Por último, llenamos los edificios en la tabla
             InicializarSistema();
-            AgregarControlesGlobales();
         }
-
+        */
         private void InicializarSistema()
         {
             for (int i = 0; i < cantidadEdificios; i++)
@@ -57,11 +111,14 @@ namespace Multi_Thread_Elevator
                 var edificio = new Edificio(i);
                 var panelEdificio = new Panel
                 {
+                    Width = 300,
                     Dock = DockStyle.Fill,
+                    Anchor = AnchorStyles.Top | AnchorStyles.Bottom,
                     BackColor = Color.LightSteelBlue,
                     Padding = new Padding(4),
                     Margin = new Padding(8)
                 };
+
 
                 var layoutPisos = new TableLayoutPanel
                 {
@@ -259,37 +316,53 @@ namespace Multi_Thread_Elevator
 
                 for (int piso = 0; piso < CANTIDAD_PISOS; piso++)
                 {
-                    var filaAscensores = new FlowLayoutPanel
-                    {
-                        Dock = DockStyle.Fill,
-                        FlowDirection = FlowDirection.LeftToRight,
-                        BackColor = (piso % 2 == 0) ? Color.White : Color.FromArgb(245, 245, 245),
-                        Padding = new Padding(3)
-                    };
 
-                    if (piso == CANTIDAD_PISOS - 1)
-                        foreach (var cont in cajasAscensores)
-                            filaAscensores.Controls.Add(cont);
-
+                    int currentPiso = piso;
+                    // Creamos el panel contenedor del piso (pisoContainer)
                     var pisoContainer = new Panel
                     {
-                        BackColor = filaAscensores.BackColor,
+                        BackColor = (piso % 2 == 0) ? Color.White : Color.FromArgb(245, 245, 245),
                         Dock = DockStyle.Fill,
                         Padding = new Padding(0, 0, 0, 2),
                         Margin = new Padding(1),
                         BorderStyle = BorderStyle.Fixed3D
                     };
+
+                    // Asociamos el evento Paint que dibuja bien centrado el número
                     pisoContainer.Paint += (s, e) =>
                     {
+                        var numeroActual = CANTIDAD_PISOS - 1 - currentPiso;
                         var g = e.Graphics;
                         using var font = new Font("Segoe UI", 28, FontStyle.Bold, GraphicsUnit.Pixel);
-                        var text = (CANTIDAD_PISOS - 1 - piso).ToString();
+                        var text = numeroActual.ToString();
                         var size = g.MeasureString(text, font);
-                        var pos = new PointF((pisoContainer.Width - size.Width) / 2,
-                                             (pisoContainer.Height - size.Height) / 2);
+                        var pos = new PointF(
+                            (pisoContainer.Width - size.Width) / 2,
+                            (pisoContainer.Height - size.Height) / 4   // un cuarto hacia abajo, para que no coincida con los ascensores
+                        );
                         using var brush = new SolidBrush(Color.FromArgb(30, 0, 0, 0));
                         g.DrawString(text, font, brush, pos);
                     };
+
+                    // Ahora creamos el FlowLayoutPanel de las cajas y anclamos **solo abajo**, con altura fija
+                    var filaAscensores = new FlowLayoutPanel
+                    {
+                        FlowDirection = FlowDirection.LeftToRight,
+                        BackColor = Color.Transparent,
+                        Height = 90,           // altura que amortigua cajas de 80px + márgenes
+                        Dock = DockStyle.Bottom,
+                        Padding = new Padding(3),
+                        AutoSize = false,
+                        WrapContents = false,
+                        Margin = new Padding(0)
+                    };
+
+                    // Añadimos aquí tus contenedores de ascensores:
+                    if (piso == CANTIDAD_PISOS - 1)
+                        foreach (var cont in cajasAscensores)
+                            filaAscensores.Controls.Add(cont);
+
+                    // Lo metemos en el panel de piso
                     pisoContainer.Controls.Add(filaAscensores);
                     layoutPisos.Controls.Add(pisoContainer, 0, piso);
                 }
@@ -313,6 +386,7 @@ namespace Multi_Thread_Elevator
                 BackColor = Color.LightSlateGray
             };
 
+            // Panel de control universal ya existente
             var panelUniversal = new PanelDeControlUniversal(cantidadEdificios, ascensoresPorEdificio, CANTIDAD_PISOS);
             panelUniversal.SolicitudUniversalGenerada += (edificioIdx, ascensorIdx, pisoOrigen, solicitud) =>
             {
@@ -320,11 +394,54 @@ namespace Multi_Thread_Elevator
                 ascensor.AgregarSolicitud(solicitud);
                 MessageBox.Show($"Solicitud enviada desde el piso {pisoOrigen} al {solicitud.PisoDestino}, tipo {solicitud.Tipo}");
             };
-
             panel.Controls.Add(panelUniversal);
+
+            // 🔽 NUEVO: Paneles por edificio con botones de pausa/reanudar
+            for (int i = 0; i < cantidadEdificios; i++)
+            {
+                int id = i;
+                var group = new GroupBox
+                {
+                    Text = $"Edificio {id}",
+                    Width = 200,
+                    Height = 90
+                };
+
+                var btnPausar = new Button
+                {
+                    Text = "⏸ Detener",
+                    Width = 80,
+                    Height = 30,
+                    Location = new Point(10, 30),
+                    BackColor = Color.OrangeRed,
+                    ForeColor = Color.White
+                };
+                var btnReanudar = new Button
+                {
+                    Text = "▶ Reanudar",
+                    Width = 80,
+                    Height = 30,
+                    Location = new Point(100, 30),
+                    BackColor = Color.SeaGreen,
+                    ForeColor = Color.White
+                };
+
+                btnPausar.Click += (s, e) =>
+                {
+                    edificios[id].Pausar();
+                };
+                btnReanudar.Click += (s, e) =>
+                {
+                    edificios[id].Reanudar();
+                };
+
+                group.Controls.Add(btnPausar);
+                group.Controls.Add(btnReanudar);
+                panel.Controls.Add(group);
+            }
+
             Controls.Add(panel);
         }
-
 
         private void AgregarControlesGlobales()
         {

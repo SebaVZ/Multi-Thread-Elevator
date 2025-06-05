@@ -25,6 +25,7 @@ public class Ascensor
 
     private static Dictionary<int, SemaphoreSlim> semaforosEdificioEspecial = new();
     public bool PuertaAbierta { get; private set; } = false;
+    private int cantidadPisos = 8;
 
     public static void InicializarSemaforos(int cantidadEdificios)
     {
@@ -180,7 +181,7 @@ public class Ascensor
     public List<int> ObtenerPisosDisponibles()
     {
         var pisos = new List<int>();
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < cantidadPisos; i++)
         {
             if (i != PisoActual) pisos.Add(i);
         }
@@ -194,7 +195,7 @@ public class Ascensor
 
     public void SolicitarIrAPiso(int piso)
     {
-        if (piso >= 0 && piso < 8)
+        if (piso >= 0 && piso < cantidadPisos)
         {
             if (piso == PisoActual) return;
             AgregarSolicitud(new Solicitud
