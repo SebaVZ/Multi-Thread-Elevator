@@ -21,6 +21,9 @@ namespace Multi_Thread_Elevator
         private Button btnPausar;
         private Button btnReanudar;
         private TableLayoutPanel layoutPrincipal;
+        private FlowLayoutPanel panelSolicitudes;
+
+        internal Dictionary<(int edificioId, int ascensorId), FlowLayoutPanel> cajasAscensor = new();
 
         public FormAscensores(int cantidadEdificios, int ascensoresPorEdificio)
         {
@@ -60,6 +63,19 @@ namespace Multi_Thread_Elevator
             AgregarControlesGlobales();
             // 5) Finalmente cargo los edificios
             InicializarSistema();
+            panelSolicitudes = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Right,
+                Width = 250,
+                AutoScroll = true,
+                Padding = new Padding(10),
+                BackColor = Color.WhiteSmoke,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false
+            };
+
+            Controls.Add(panelSolicitudes);
+
         }
 
 
@@ -153,7 +169,7 @@ namespace Multi_Thread_Elevator
                         FlowDirection = FlowDirection.TopDown,
                         WrapContents = false
                     };
-
+                    cajasAscensor[(i, j)] = caja;
                     // Contenedor (GroupBox)
                     var contenedor = new GroupBox
                     {
@@ -231,23 +247,7 @@ namespace Multi_Thread_Elevator
                     btnBajar.FlatAppearance.BorderSize = 0;
                     btnBajar.Click += (s, e) => ascensor.SolicitarIrAPiso(0);
 
-                    var btnAbrir = new Button
-                    {
-                        Text = "⦿",
-                        Font = new Font("Segoe UI", 10f, FontStyle.Bold),
-                        Width = 30,
-                        Height = 24,
-                        FlatStyle = FlatStyle.Flat,
-                        Margin = new Padding(1),
-                        BackColor = Color.Red
-                    };
-                    btnAbrir.FlatAppearance.BorderSize = 0;
-                    btnAbrir.Click += (s, e) =>
-                    {
-                        if (sistemaPausado || ascensor.EnMovimiento) return;
-                        ascensor.AlternarPuerta();
-                    };
-
+                   
                     // Label de solicitudes con fuente pequeña
                     var labelSolicitudes = new Label
                     {
@@ -270,7 +270,6 @@ namespace Multi_Thread_Elevator
                     };
                     panelControles.Controls.Add(btnSubir);
                     panelControles.Controls.Add(btnBajar);
-                    panelControles.Controls.Add(btnAbrir);
                     caja.Controls.Add(panelControles);
                     caja.Controls.Add(labelSolicitudes);
 
@@ -282,8 +281,6 @@ namespace Multi_Thread_Elevator
                         {
                             btnSubir.Visible = ascensor.PisoActual < CANTIDAD_PISOS - 1 && !ascensor.PuertaAbierta;
                             btnBajar.Visible = ascensor.PisoActual > 0 && !ascensor.PuertaAbierta;
-                            btnAbrir.Text = ascensor.PuertaAbierta ? "⦾" : "⦿";
-                            btnAbrir.BackColor = ascensor.PuertaAbierta ? Color.Green : Color.Red;
                             comboDestino.Enabled = !ascensor.PuertaAbierta;
 
                             var pendientes = ascensor.SolicitudesPendientes.Select(s => s.PisoDestino.ToString()).ToArray();
@@ -308,6 +305,7 @@ namespace Multi_Thread_Elevator
                             int targetRow = CANTIDAD_PISOS - 1 - ascensor.PisoActual;
                             var destinoPanel = layoutPisos.GetControlFromPosition(0, targetRow) as Panel;
                             destinoPanel?.Controls[0].Controls.Add(contenedor);
+                            ActualizarPanelSolicitudes();
                         });
                     };
 
@@ -537,7 +535,7 @@ namespace Multi_Thread_Elevator
                 ascensor.Pausar();
         }
 
-        private Task InvokeAsync(Action action)
+        public Task InvokeAsync(Action action)
         {
             var tcs = new TaskCompletionSource<object>();
             Invoke(new MethodInvoker(() =>
@@ -554,5 +552,66 @@ namespace Multi_Thread_Elevator
             }));
             return tcs.Task;
         }
+
+        private void ActualizarPanelSolicitudes()
+        {
+            if (panelSolicitudes == null) return;
+
+            panelSolicitudes.Controls.Clear();
+
+            foreach (var edificio in edificios)
+            {
+                var labelEdificio = new Label
+                {
+                    Text = $"Edificio {edificio.Id}",
+                    Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                    AutoSize = true,
+                    Margin = new Padding(0, 10, 0, 4)
+                };
+                panelSolicitudes.Controls.Add(labelEdificio);
+
+                foreach (var ascensor in edificio.Ascensores)
+                {
+                    var labelAscensor = new Label
+                    {
+                        Text = $"Asc {ascensor.Id}:",
+                        Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                        AutoSize = true,
+                        Margin = new Padding(10, 4, 0, 2)
+                    };
+                    panelSolicitudes.Controls.Add(labelAscensor);
+
+                    var solicitudes = ascensor.SolicitudesPendientes;
+
+                    if (solicitudes.Count == 0)
+                    {
+                        var labelVacio = new Label
+                        {
+                            Text = "- (sin solicitudes)",
+                            Font = new Font("Segoe UI", 9f, FontStyle.Italic),
+                            AutoSize = true,
+                            Margin = new Padding(20, 0, 0, 2)
+                        };
+                        panelSolicitudes.Controls.Add(labelVacio);
+                    }
+                    else
+                    {
+                        foreach (var s in solicitudes)
+                        {
+                            var tipo = s.Tipo == TipoSolicitud.Especial ? "Esp" : "Nor";
+                            var labelSolicitud = new Label
+                            {
+                                Text = $"- {s.PisoDestino}, {tipo}",
+                                Font = new Font("Segoe UI", 9f),
+                                AutoSize = true,
+                                Margin = new Padding(20, 0, 0, 2)
+                            };
+                            panelSolicitudes.Controls.Add(labelSolicitud);
+                        }
+                    }
+                }
+            }
+        }
+
     }
 }

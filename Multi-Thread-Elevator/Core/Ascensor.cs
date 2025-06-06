@@ -1,4 +1,5 @@
 ﻿// Ascensor.cs actualizado: Indicador de piso actual y lista de solicitudes pendientes
+using Multi_Thread_Elevator;
 using Multi_Thread_Elevator.Models;
 using System.Collections.Generic;
 using System.Linq;
@@ -142,7 +143,6 @@ public class Ascensor
         }
     }
 
-
     private async Task MoverAlPiso(Solicitud solicitud, CancellationToken token)
     {
         EnMovimiento = true;
@@ -150,33 +150,31 @@ public class Ascensor
 
         int destino = solicitud.PisoDestino;
 
-        // ÚNICO bucle principal
         while (PisoActual != destino && !token.IsCancellationRequested)
         {
-            // 1) Si la puerta está abierta, esperamos aquí hasta que se cierre:
-            if (PuertaAbierta)
-            {
-                await Task.Delay(200, token);
-                continue;
-            }
-
-            // 2) Puerta cerrada: avanzamos un piso
             PisoActual += PisoActual < destino ? 1 : -1;
             ActualizarGUI?.Invoke();
-
-            // 3) Pausa entre pisos
             await Task.Delay(VelocidadMovimientoMs, token);
         }
 
-        EnMovimiento = false;
+        // 🟩 Simulación de apertura de puertas
+        PuertaAbierta = true;
+        ActualizarGUI?.Invoke();
+
+        // Nueva lógica: cambiar color del piso a rojo, luego a negro
+        await AbrirPuertaVisual();
+
+        PuertaAbierta = false;
         ActualizarGUI?.Invoke();
 
         lock (solicitudes)
         {
             solicitudes.Remove(solicitud);
         }
-    }
 
+        EnMovimiento = false;
+        ActualizarGUI?.Invoke();
+    }
 
     public List<int> ObtenerPisosDisponibles()
     {
@@ -212,6 +210,33 @@ public class Ascensor
 
         PuertaAbierta = !PuertaAbierta;
         ActualizarGUI?.Invoke();
+    }
+
+    private async Task AbrirPuertaVisual()
+    {
+        await Task.Delay(50); // sincronización
+        var form = Application.OpenForms.OfType<FormAscensores>().FirstOrDefault();
+        if (form == null) return;
+
+        // 1. Pintar ascensor en rojo (puerta abierta)
+        await form.InvokeAsync(() =>
+        {
+            if (form.cajasAscensor.TryGetValue((EdificioId, Id), out var caja))
+            {
+                caja.BackColor = Color.Green;
+            }
+        });
+
+        await Task.Delay(500); // esperar 0.5 segundos
+
+        // 2. Regresar a color original
+        await form.InvokeAsync(() =>
+        {
+            if (form.cajasAscensor.TryGetValue((EdificioId, Id), out var caja))
+            {
+                caja.BackColor = Color.FromArgb(40, 40, 40);
+            }
+        });
     }
 
 }
