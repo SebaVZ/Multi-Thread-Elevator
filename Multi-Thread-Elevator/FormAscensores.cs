@@ -15,44 +15,45 @@ namespace Multi_Thread_Elevator
         private readonly int ascensoresPorEdificio;
         private readonly List<Edificio> edificios = new();
         private readonly TableLayoutPanel layoutEdificios;
-        private const int CANTIDAD_PISOS = 8;
+        private readonly int cantidadPisos;
 
-        private bool sistemaPausado = false;
         private Button btnPausar;
         private Button btnReanudar;
-        private TableLayoutPanel layoutPrincipal;
         private FlowLayoutPanel panelSolicitudes;
 
         internal Dictionary<(int edificioId, int ascensorId), FlowLayoutPanel> cajasAscensor = new();
 
-        public FormAscensores(int cantidadEdificios, int ascensoresPorEdificio)
+        public FormAscensores(int cantidadEdificios, int ascensoresPorEdificio, int cantidadPisos)
         {
             InitializeComponent();
             this.WindowState = FormWindowState.Maximized;
             this.cantidadEdificios = cantidadEdificios;
             this.ascensoresPorEdificio = ascensoresPorEdificio;
+            this.cantidadPisos = cantidadPisos;
             Ascensor.InicializarSemaforos(cantidadEdificios);
 
             // 2) Creo el scrollPanel y lo añado de fondo:
-            var scrollPanel = new Panel
+            var scrollPanel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
-                BackColor = Color.LightGray
+                BackColor = Color.LightGray,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
             };
             Controls.Add(scrollPanel);
 
             // 3) Dentro, el layout que crece horizontalmente:
             layoutEdificios = new TableLayoutPanel
             {
-                //AutoSize = true,
-                //AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Dock = DockStyle.Fill,        // <-- NO Fill
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 ColumnCount = cantidadEdificios,
                 RowCount = 1,
                 CellBorderStyle = TableLayoutPanelCellBorderStyle.Single,
                 BackColor = Color.Transparent
             };
+
             scrollPanel.Controls.Add(layoutEdificios);
 
             // 4) Columnas fijas de 300px
@@ -127,37 +128,36 @@ namespace Multi_Thread_Elevator
                 var edificio = new Edificio(i);
                 var panelEdificio = new Panel
                 {
-                    Width = 300,
-                    Dock = DockStyle.Fill,
-                    Anchor = AnchorStyles.Top | AnchorStyles.Bottom,
+                    Width = 250,
+                    MinimumSize = new Size(300, 700),
                     BackColor = Color.LightSteelBlue,
                     Padding = new Padding(4),
-                    Margin = new Padding(8)
+                    Margin = new Padding(8),
+                    AutoScroll = false
                 };
 
 
                 var layoutPisos = new TableLayoutPanel
                 {
                     Dock = DockStyle.Fill,
-                    RowCount = CANTIDAD_PISOS,
+                    RowCount = cantidadPisos,
                     ColumnCount = 1,
                     BackColor = Color.Transparent
                 };
-                for (int r = 0; r < CANTIDAD_PISOS; r++)
-                    layoutPisos.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / CANTIDAD_PISOS));
+                for (int r = 0; r < cantidadPisos; r++)
+                    layoutPisos.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / cantidadPisos));
                 layoutPisos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
                 var cajasAscensores = new List<Control>();
 
                 for (int j = 0; j < ascensoresPorEdificio; j++)
                 {
-                    var ascensor = new Ascensor(j)
+                    var ascensor = new Ascensor(j, cantidadPisos)
                     {
                         EdificioId = i,
                         Identificador = j.ToString()
                     };
                     edificio.Ascensores.Add(ascensor);
-
                     // Caja interna redimensionada
                     var caja = new FlowLayoutPanel
                     {
@@ -170,19 +170,6 @@ namespace Multi_Thread_Elevator
                         WrapContents = false
                     };
                     cajasAscensor[(i, j)] = caja;
-                    // Contenedor (GroupBox)
-                    var contenedor = new GroupBox
-                    {
-                        Text = $"Asc. {j}",
-                        Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-                        ForeColor = Color.White,
-                        BackColor = Color.FromArgb(30, 30, 30),
-                        Padding = new Padding(4),
-                        Margin = new Padding(4),
-                        AutoSize = true,
-                        Dock = DockStyle.Bottom
-                    };
-                    contenedor.Controls.Add(caja);
 
                     // Label ID y ComboBox
                     var labelId = new Label
@@ -201,7 +188,7 @@ namespace Multi_Thread_Elevator
                         Margin = new Padding(0, 0, 0, 2),
                         FlatStyle = FlatStyle.Popup
                     };
-                    for (int piso = 0; piso < CANTIDAD_PISOS; piso++)
+                    for (int piso = 0; piso < cantidadPisos; piso++)
                         comboDestino.Items.Add(piso.ToString());
                     int ultimoPisoSeleccionado = -1;
                     comboDestino.SelectedIndexChanged += (s, e) =>
@@ -216,39 +203,7 @@ namespace Multi_Thread_Elevator
                         }
                     };
 
-                    // Botones con tamaño reducido
-                    var btnSubir = new Button
-                    {
-                        Text = "↑",
-                        Font = new Font("Segoe UI", 12f, FontStyle.Bold),
-                        Width = 30,
-                        Height = 24,
-                        FlatStyle = FlatStyle.Flat,
-                        BackColor = Color.FromArgb(50, 50, 50),
-                        ForeColor = Color.White,
-                        Margin = new Padding(1),
-                        Visible = true
-                    };
-                    btnSubir.FlatAppearance.BorderSize = 0;
-                    btnSubir.Click += (s, e) => ascensor.SolicitarIrAPiso(CANTIDAD_PISOS - 1);
-
-                    var btnBajar = new Button
-                    {
-                        Text = "↓",
-                        Font = new Font("Segoe UI", 12f, FontStyle.Bold),
-                        Width = 30,
-                        Height = 24,
-                        FlatStyle = FlatStyle.Flat,
-                        BackColor = Color.FromArgb(50, 50, 50),
-                        ForeColor = Color.White,
-                        Margin = new Padding(1),
-                        Visible = false
-                    };
-                    btnBajar.FlatAppearance.BorderSize = 0;
-                    btnBajar.Click += (s, e) => ascensor.SolicitarIrAPiso(0);
-
-                   
-                    // Label de solicitudes con fuente pequeña
+                    // Label de solicitudes
                     var labelSolicitudes = new Label
                     {
                         Text = "P: -",
@@ -268,19 +223,16 @@ namespace Multi_Thread_Elevator
                         WrapContents = false,
                         Margin = new Padding(0)
                     };
-                    panelControles.Controls.Add(btnSubir);
-                    panelControles.Controls.Add(btnBajar);
+                    
                     caja.Controls.Add(panelControles);
                     caja.Controls.Add(labelSolicitudes);
 
-                    cajasAscensores.Add(contenedor);
+                    cajasAscensores.Add(caja);
 
                     ascensor.ActualizarGUI = async () =>
                     {
                         await InvokeAsync(() =>
                         {
-                            btnSubir.Visible = ascensor.PisoActual < CANTIDAD_PISOS - 1 && !ascensor.PuertaAbierta;
-                            btnBajar.Visible = ascensor.PisoActual > 0 && !ascensor.PuertaAbierta;
                             comboDestino.Enabled = !ascensor.PuertaAbierta;
 
                             var pendientes = ascensor.SolicitudesPendientes.Select(s => s.PisoDestino.ToString()).ToArray();
@@ -288,31 +240,36 @@ namespace Multi_Thread_Elevator
                                 ? $"P: {string.Join(",", pendientes)}"
                                 : "P: -";
 
-                            // Reposicionar grupo
+                            // Reposicionar la caja en el piso correspondiente
                             for (int fila = 0; fila < layoutPisos.RowCount; fila++)
                             {
                                 var panelPiso = layoutPisos.GetControlFromPosition(0, fila) as Panel;
                                 if (panelPiso?.Controls.Count > 0)
                                 {
                                     var child = panelPiso.Controls[0];
-                                    if (child.Controls.Contains(contenedor))
+                                    if (child.Controls.Contains(caja))
                                     {
-                                        child.Controls.Remove(contenedor);
+                                        child.Controls.Remove(caja);
                                         break;
                                     }
                                 }
                             }
-                            int targetRow = CANTIDAD_PISOS - 1 - ascensor.PisoActual;
+
+                            int targetRow = cantidadPisos - 1 - ascensor.PisoActual;
                             var destinoPanel = layoutPisos.GetControlFromPosition(0, targetRow) as Panel;
-                            destinoPanel?.Controls[0].Controls.Add(contenedor);
-                            ActualizarPanelSolicitudes();
+                            destinoPanel?.Controls[0].Controls.Add(caja);
+
                         });
+                    };
+                    ascensor.NotificarCambioSolicitudes = () =>
+                    {
+                        Invoke(() => ActualizarPanelSolicitudes());
                     };
 
                     ascensor.Iniciar();
                 }
 
-                for (int piso = 0; piso < CANTIDAD_PISOS; piso++)
+                for (int piso = 0; piso < cantidadPisos; piso++)
                 {
 
                     int currentPiso = piso;
@@ -329,7 +286,7 @@ namespace Multi_Thread_Elevator
                     // Asociamos el evento Paint que dibuja bien centrado el número
                     pisoContainer.Paint += (s, e) =>
                     {
-                        var numeroActual = CANTIDAD_PISOS - 1 - currentPiso;
+                        var numeroActual = cantidadPisos - 1 - currentPiso;
                         var g = e.Graphics;
                         using var font = new Font("Segoe UI", 28, FontStyle.Bold, GraphicsUnit.Pixel);
                         var text = numeroActual.ToString();
@@ -356,7 +313,7 @@ namespace Multi_Thread_Elevator
                     };
 
                     // Añadimos aquí tus contenedores de ascensores:
-                    if (piso == CANTIDAD_PISOS - 1)
+                    if (piso == cantidadPisos - 1)
                         foreach (var cont in cajasAscensores)
                             filaAscensores.Controls.Add(cont);
 
@@ -385,7 +342,7 @@ namespace Multi_Thread_Elevator
             };
 
             // Panel de control universal ya existente
-            var panelUniversal = new PanelDeControlUniversal(cantidadEdificios, ascensoresPorEdificio, CANTIDAD_PISOS);
+            var panelUniversal = new PanelDeControlUniversal(cantidadEdificios, ascensoresPorEdificio, cantidadPisos);
             panelUniversal.SolicitudUniversalGenerada += (edificioIdx, ascensorIdx, pisoOrigen, solicitud) =>
             {
                 var ascensor = edificios[edificioIdx].Ascensores[ascensorIdx];

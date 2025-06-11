@@ -14,6 +14,7 @@ public class Ascensor
     public bool EnMovimiento { get; private set; } = false;
     public bool EjecutandoEspecial { get; private set; } = false;
     public Action ActualizarGUI { get; set; }
+    public Action NotificarCambioSolicitudes { get; set; }
     public List<Solicitud> SolicitudesPendientes => new(solicitudes);
     public Label EstadoLabel { get; set; } // Label para mostrar estado visual
 
@@ -26,7 +27,8 @@ public class Ascensor
 
     private static Dictionary<int, SemaphoreSlim> semaforosEdificioEspecial = new();
     public bool PuertaAbierta { get; private set; } = false;
-    private int cantidadPisos = 8;
+    private int cantidadPisos;
+    private DateTime ultimaActualizacionGui = DateTime.MinValue;
 
     public static void InicializarSemaforos(int cantidadEdificios)
     {
@@ -36,10 +38,12 @@ public class Ascensor
     }
 
 
-    public Ascensor(int id)
+    public Ascensor(int id, int cantidadPisos)
     {
         Id = id;
+        this.cantidadPisos = cantidadPisos;
     }
+
 
     public void AgregarSolicitud(Solicitud solicitud)
     {
@@ -52,6 +56,8 @@ public class Ascensor
                 return prioridad != 0 ? prioridad : a.TiempoSolicitud.CompareTo(b.TiempoSolicitud);
             });
         }
+        //ActualizarGUI?.Invoke();
+        //NotificarCambioSolicitudes();
     }
 
     public void Iniciar()
@@ -146,7 +152,11 @@ public class Ascensor
     private async Task MoverAlPiso(Solicitud solicitud, CancellationToken token)
     {
         EnMovimiento = true;
-        ActualizarGUI?.Invoke();
+        if ((DateTime.Now - ultimaActualizacionGui).TotalMilliseconds >= 100)
+        {
+            ultimaActualizacionGui = DateTime.Now;
+            ActualizarGUI?.Invoke();
+        }
 
         int destino = solicitud.PisoDestino;
 
@@ -165,15 +175,16 @@ public class Ascensor
         await AbrirPuertaVisual();
 
         PuertaAbierta = false;
-        ActualizarGUI?.Invoke();
 
         lock (solicitudes)
         {
             solicitudes.Remove(solicitud);
         }
+        
 
         EnMovimiento = false;
         ActualizarGUI?.Invoke();
+        NotificarCambioSolicitudes();
     }
 
     public List<int> ObtenerPisosDisponibles()

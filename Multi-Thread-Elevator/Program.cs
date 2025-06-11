@@ -14,7 +14,7 @@ namespace Multi_Thread_Elevator
             var configuracion = new FormConfiguracion();
             if (configuracion.ShowDialog() == DialogResult.OK)
             {
-                Application.Run(new FormAscensores(configuracion.CantidadEdificios, configuracion.AscensoresPorEdificio));
+                Application.Run(new FormAscensores(configuracion.CantidadEdificios, configuracion.AscensoresPorEdificio, configuracion.CantidadPisos));
             }
         }
     }

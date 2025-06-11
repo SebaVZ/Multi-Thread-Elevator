@@ -7,20 +7,18 @@ namespace Multi_Thread_Elevator
     {
         public int CantidadEdificios { get; private set; }
         public int AscensoresPorEdificio { get; private set; }
+        public int CantidadPisos { get; private set; }
 
         public FormConfiguracion()
         {
             InitializeComponent();
 
-            // para que al pulsar Enter en cualquier otro control con HandleKeyPreview funcione.
-            //this.AcceptButton = btnAceptar;
-
             txtEdificios.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
                 {
-                    e.SuppressKeyPress = true;   // evita el "ding"
-                    txtAscensores.Focus();       // mueve foco
+                    e.SuppressKeyPress = true;
+                    txtAscensores.Focus();
                 }
             };
 
@@ -29,7 +27,16 @@ namespace Multi_Thread_Elevator
                 if (e.KeyCode == Keys.Enter)
                 {
                     e.SuppressKeyPress = true;
-                    btnAceptar.PerformClick();   // dispara tu lógica de Aceptar
+                    txtPisos.Focus();
+                }
+            };
+
+            txtPisos.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.SuppressKeyPress = true;
+                    btnAceptar.PerformClick(); // llama a la validación
                 }
             };
         }
@@ -38,18 +45,21 @@ namespace Multi_Thread_Elevator
         {
             if (int.TryParse(txtEdificios.Text, out int edificios) &&
                 int.TryParse(txtAscensores.Text, out int ascensores) &&
-                edificios > 0 && ascensores > 0)
+                int.TryParse(txtPisos.Text, out int pisos) &&
+                edificios >= 1 && edificios <= 5 &&
+                ascensores >= 1 && ascensores <= 3 &&
+                pisos >= 3 && pisos <= 8)
             {
                 CantidadEdificios = edificios;
                 AscensoresPorEdificio = ascensores;
+                CantidadPisos = pisos;
                 DialogResult = DialogResult.OK;
                 this.Close();
             }
             else
             {
-                MessageBox.Show("Ingrese valores válidos mayores que 0.");
+                MessageBox.Show("Valores inválidos. Verifique los rangos permitidos:\n- Edificios (1-5)\n- Ascensores (1-3)\n- Pisos (3-8)");
             }
         }
-
     }
 }
