@@ -21,6 +21,7 @@ public class Ascensor
     private readonly List<Solicitud> solicitudes = new();
     private CancellationTokenSource cts;
     private Task tareaAscensor;
+    private Solicitud solicitudEnCurso;
     private bool estaEnEjecucion = false;
     public static int VelocidadMovimientoMs { get; set; } = 500;
     public int EdificioId { get; set; }
@@ -45,22 +46,56 @@ public class Ascensor
 
     public void AgregarSolicitud(Solicitud solicitud)
     {
+        // 🚫 Evitar solicitud al mismo piso actual
         if (solicitud.Tipo == TipoSolicitud.Normal && solicitud.PisoDestino == PisoActual)
             return;
 
+        // 🚫 Evitar duplicados por piso
+        lock (solicitudes)
+        {
+            if (solicitudes.Any(s => s.PisoDestino == solicitud.PisoDestino))
+            {
+                MessageBox.Show($"Ya existe una solicitud al piso {solicitud.PisoDestino} para este ascensor.", "Solicitud Duplicada", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+        }
+
+        // 🚫 Solo se permite una solicitud especial por edificio
         if (solicitud.Tipo == TipoSolicitud.Especial)
         {
             var edificio = Application.OpenForms.OfType<FormAscensores>()
                              .FirstOrDefault()?.edificios
                              .FirstOrDefault(e => e.Id == EdificioId);
 
-            if (edificio?.HayEspecialEnCurso == true)
+            bool especialActiva = false;
+
+            if (edificio != null)
             {
-                MessageBox.Show("Ya hay una solicitud especial en curso en este edificio.", "Solicitud Rechazada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                foreach (var asc in edificio.Ascensores)
+                {
+                    if (asc.EjecutandoEspecial)
+                        especialActiva = true;
+
+                    lock (asc.solicitudes)
+                    {
+                        if (asc.solicitudes.Any(s => s.Tipo == TipoSolicitud.Especial))
+                        {
+                            especialActiva = true;
+                        }
+                    }
+
+                    if (especialActiva) break;
+                }
+            }
+
+            if (especialActiva)
+            {
+                MessageBox.Show("Ya hay una solicitud especial activa o pendiente en este edificio.", "Solicitud Rechazada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
         }
 
+        // ✅ Si pasó todas las validaciones, agregar la solicitud
         lock (solicitudes)
         {
             solicitudes.Add(solicitud);
@@ -91,6 +126,18 @@ public class Ascensor
         if (!estaEnEjecucion) return;
 
         cts?.Cancel();
+
+        // Recuperar solicitud en curso si no se completó
+        if (solicitudEnCurso != null)
+        {
+            lock (solicitudes)
+            {
+                solicitudes.Insert(0, solicitudEnCurso); // Prioridad alta
+            }
+            solicitudEnCurso = null;
+        }
+
+        EjecutandoEspecial = false; // Asegura que el flag no quede colgado
         estaEnEjecucion = false;
     }
 
@@ -102,39 +149,44 @@ public class Ascensor
             {
                 Solicitud solicitud = null;
 
-                lock (solicitudes)
+                if (solicitudEnCurso != null)
                 {
-                    var especial = solicitudes.FirstOrDefault(s => s.Tipo == TipoSolicitud.Especial);
-                    if (especial != null)
+                    solicitud = solicitudEnCurso;
+                    solicitudEnCurso = null;
+                }
+                else
+                {
+                    lock (solicitudes)
                     {
-                        solicitud = especial;
-                        solicitudes.Remove(especial);
-                    }
-                    else if (solicitudes.Count > 0)
-                    {
-                        // Direccion estimada: primera solicitud vs piso actual
-                        var solicitudMasCercana = solicitudes
-                            .Where(s => s.Tipo == TipoSolicitud.Normal)
-                            .OrderBy(s => Math.Abs(s.PisoDestino - PisoActual))
-                            .FirstOrDefault();
-
-                        int sentido = solicitudMasCercana != null && solicitudMasCercana.PisoDestino > PisoActual ? 1 : -1;
-
-
-                        var enDireccion = solicitudes
-                            .Where(s => (s.PisoDestino - PisoActual) * sentido > 0) // en la dirección
-                            .OrderBy(s => Math.Abs(s.PisoDestino - PisoActual))     // más cercana primero
-                            .ThenBy(s => s.TiempoSolicitud)
-                            .ToList();
-
-                        if (enDireccion.Any())
+                        var especial = solicitudes.FirstOrDefault(s => s.Tipo == TipoSolicitud.Especial);
+                        if (especial != null)
                         {
-                            solicitud = enDireccion.First();
+                            solicitud = especial;
+                            solicitudes.Remove(especial);
                         }
-                        else
+                        else if (solicitudes.Count > 0)
                         {
-                            // Si no hay ninguna en dirección, tomar la siguiente mejor
-                            solicitud = solicitudes[0];
+                            var solicitudMasCercana = solicitudes
+                                .Where(s => s.Tipo == TipoSolicitud.Normal)
+                                .OrderBy(s => Math.Abs(s.PisoDestino - PisoActual))
+                                .FirstOrDefault();
+
+                            int sentido = solicitudMasCercana != null && solicitudMasCercana.PisoDestino > PisoActual ? 1 : -1;
+
+                            var enDireccion = solicitudes
+                                .Where(s => (s.PisoDestino - PisoActual) * sentido > 0)
+                                .OrderBy(s => Math.Abs(s.PisoDestino - PisoActual))
+                                .ThenBy(s => s.TiempoSolicitud)
+                                .ToList();
+
+                            if (enDireccion.Any())
+                            {
+                                solicitud = enDireccion.First();
+                            }
+                            else
+                            {
+                                solicitud = solicitudes[0];
+                            }
                         }
                     }
                 }
@@ -169,6 +221,8 @@ public class Ascensor
         finally
         {
             estaEnEjecucion = false;
+            EjecutandoEspecial = false;
+            solicitudEnCurso = null;
         }
     }
 
@@ -180,7 +234,7 @@ public class Ascensor
             ultimaActualizacionGui = DateTime.Now;
             ActualizarGUI?.Invoke();
         }
-
+        solicitudEnCurso = solicitud;
         int destino = solicitud.PisoDestino;
 
         while (PisoActual != destino && !token.IsCancellationRequested)
@@ -194,6 +248,7 @@ public class Ascensor
         ActualizarGUI?.Invoke();
         await AbrirPuertaVisual();
         PuertaAbierta = false;
+        solicitudEnCurso = null;
 
         lock (solicitudes)
         {
