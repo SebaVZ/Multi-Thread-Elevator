@@ -16,7 +16,7 @@ public class Ascensor
     public Action ActualizarGUI { get; set; }
     public Action NotificarCambioSolicitudes { get; set; }
     public List<Solicitud> SolicitudesPendientes => new(solicitudes);
-    public Label EstadoLabel { get; set; } // Label para mostrar estado visual
+    public Label EstadoLabel { get; set; }
 
     private readonly List<Solicitud> solicitudes = new();
     private CancellationTokenSource cts;
@@ -37,16 +37,30 @@ public class Ascensor
             semaforosEdificioEspecial[i] = new SemaphoreSlim(1, 1);
     }
 
-
     public Ascensor(int id, int cantidadPisos)
     {
         Id = id;
         this.cantidadPisos = cantidadPisos;
     }
 
-
     public void AgregarSolicitud(Solicitud solicitud)
     {
+        if (solicitud.Tipo == TipoSolicitud.Normal && solicitud.PisoDestino == PisoActual)
+            return;
+
+        if (solicitud.Tipo == TipoSolicitud.Especial)
+        {
+            var edificio = Application.OpenForms.OfType<FormAscensores>()
+                             .FirstOrDefault()?.edificios
+                             .FirstOrDefault(e => e.Id == EdificioId);
+
+            if (edificio?.HayEspecialEnCurso == true)
+            {
+                MessageBox.Show("Ya hay una solicitud especial en curso en este edificio.", "Solicitud Rechazada", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+        }
+
         lock (solicitudes)
         {
             solicitudes.Add(solicitud);
@@ -56,8 +70,8 @@ public class Ascensor
                 return prioridad != 0 ? prioridad : a.TiempoSolicitud.CompareTo(b.TiempoSolicitud);
             });
         }
-        //ActualizarGUI?.Invoke();
-        //NotificarCambioSolicitudes();
+
+        NotificarCambioSolicitudes?.Invoke();
     }
 
     public void Iniciar()
@@ -90,28 +104,37 @@ public class Ascensor
 
                 lock (solicitudes)
                 {
-                    // Si hay solicitud especial, tomarla de inmediato
                     var especial = solicitudes.FirstOrDefault(s => s.Tipo == TipoSolicitud.Especial);
                     if (especial != null)
                     {
                         solicitud = especial;
                         solicitudes.Remove(especial);
                     }
-                    else
+                    else if (solicitudes.Count > 0)
                     {
-                        // Ordenar solicitudes normales por cercanía al piso actual
-                        solicitudes.Sort((a, b) =>
-                        {
-                            int diffA = Math.Abs(a.PisoDestino - PisoActual);
-                            int diffB = Math.Abs(b.PisoDestino - PisoActual);
-                            return diffA != diffB ? diffA.CompareTo(diffB) :
-                                a.TiempoSolicitud.CompareTo(b.TiempoSolicitud);
-                        });
+                        // Direccion estimada: primera solicitud vs piso actual
+                        var solicitudMasCercana = solicitudes
+                            .Where(s => s.Tipo == TipoSolicitud.Normal)
+                            .OrderBy(s => Math.Abs(s.PisoDestino - PisoActual))
+                            .FirstOrDefault();
 
-                        if (solicitudes.Count > 0)
+                        int sentido = solicitudMasCercana != null && solicitudMasCercana.PisoDestino > PisoActual ? 1 : -1;
+
+
+                        var enDireccion = solicitudes
+                            .Where(s => (s.PisoDestino - PisoActual) * sentido > 0) // en la dirección
+                            .OrderBy(s => Math.Abs(s.PisoDestino - PisoActual))     // más cercana primero
+                            .ThenBy(s => s.TiempoSolicitud)
+                            .ToList();
+
+                        if (enDireccion.Any())
                         {
+                            solicitud = enDireccion.First();
+                        }
+                        else
+                        {
+                            // Si no hay ninguna en dirección, tomar la siguiente mejor
                             solicitud = solicitudes[0];
-                            //solicitudes.RemoveAt(0);
                         }
                     }
                 }
@@ -167,20 +190,15 @@ public class Ascensor
             await Task.Delay(VelocidadMovimientoMs, token);
         }
 
-        // 🟩 Simulación de apertura de puertas
         PuertaAbierta = true;
         ActualizarGUI?.Invoke();
-
-        // Nueva lógica: cambiar color del piso a rojo, luego a negro
         await AbrirPuertaVisual();
-
         PuertaAbierta = false;
 
         lock (solicitudes)
         {
             solicitudes.Remove(solicitud);
         }
-        
 
         EnMovimiento = false;
         ActualizarGUI?.Invoke();
@@ -225,11 +243,10 @@ public class Ascensor
 
     private async Task AbrirPuertaVisual()
     {
-        await Task.Delay(50); // sincronización
+        await Task.Delay(50);
         var form = Application.OpenForms.OfType<FormAscensores>().FirstOrDefault();
         if (form == null) return;
 
-        // 1. Pintar ascensor en rojo (puerta abierta)
         await form.InvokeAsync(() =>
         {
             if (form.cajasAscensor.TryGetValue((EdificioId, Id), out var caja))
@@ -238,9 +255,8 @@ public class Ascensor
             }
         });
 
-        await Task.Delay(500); // esperar 0.5 segundos
+        await Task.Delay(500);
 
-        // 2. Regresar a color original
         await form.InvokeAsync(() =>
         {
             if (form.cajasAscensor.TryGetValue((EdificioId, Id), out var caja))
@@ -250,4 +266,17 @@ public class Ascensor
         });
     }
 
+    private void OrdenarSolicitudes()
+    {
+        if (solicitudes.Count == 0) return;
+
+        if (solicitudes[0].PisoDestino > PisoActual)
+        {
+            solicitudes.Sort((a, b) => a.PisoDestino.CompareTo(b.PisoDestino));
+        }
+        else
+        {
+            solicitudes.Sort((a, b) => b.PisoDestino.CompareTo(a.PisoDestino));
+        }
+    }
 }

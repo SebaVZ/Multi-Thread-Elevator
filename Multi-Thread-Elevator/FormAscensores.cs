@@ -13,7 +13,7 @@ namespace Multi_Thread_Elevator
     {
         private readonly int cantidadEdificios;
         private readonly int ascensoresPorEdificio;
-        private readonly List<Edificio> edificios = new();
+        public List<Edificio> edificios = new();
         private readonly TableLayoutPanel layoutEdificios;
         private readonly int cantidadPisos;
 
@@ -76,51 +76,8 @@ namespace Multi_Thread_Elevator
             };
 
             Controls.Add(panelSolicitudes);
-
         }
 
-
-        /*public FormAscensores(int cantidadEdificios, int ascensoresPorEdificio)
-        {
-            InitializeComponent();
-            this.WindowState = FormWindowState.Maximized;
-            this.cantidadEdificios = cantidadEdificios;
-            this.ascensoresPorEdificio = ascensoresPorEdificio;
-            Ascensor.InicializarSemaforos(cantidadEdificios);
-
-            // 1) Creamos y añadimos primero el scrollPanel (queda detrás de todo)
-            var scrollPanel = new Panel
-            {
-                Dock = DockStyle.Fill,
-                AutoScroll = true,
-                BackColor = Color.LightGray
-            };
-            Controls.Add(scrollPanel);
-
-            // 2) Dentro, la tabla de edificios
-            layoutEdificios = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = cantidadEdificios,
-                RowCount = 1,
-                CellBorderStyle = TableLayoutPanelCellBorderStyle.Single,
-                BackColor = Color.Transparent
-            };
-            scrollPanel.Controls.Add(layoutEdificios);
-
-            for (int i = 0; i < cantidadEdificios; i++)
-                layoutEdificios.ColumnStyles.Add(
-                    new ColumnStyle(SizeType.Absolute, 300f)
-                );
-
-            // 3) Ahora sí agregamos los controles fijos **por encima** del scrollPanel:
-            AgregarControlesGlobales();    // topPanel.Dock = Top
-            //CrearPanelesDeControl();       // panelUniversal.Dock = Left
-
-            // 4) Por último, llenamos los edificios en la tabla
-            InicializarSistema();
-        }
-        */
         private void InicializarSistema()
         {
             for (int i = 0; i < cantidadEdificios; i++)
@@ -343,15 +300,15 @@ namespace Multi_Thread_Elevator
 
             // Panel de control universal ya existente
             var panelUniversal = new PanelDeControlUniversal(cantidadEdificios, ascensoresPorEdificio, cantidadPisos);
-            panelUniversal.SolicitudUniversalGenerada += (edificioIdx, ascensorIdx, pisoOrigen, solicitud) =>
+            panelUniversal.SolicitudUniversalGenerada += (edificioIdx, ascensorIdx, _, solicitud) =>
             {
                 var ascensor = edificios[edificioIdx].Ascensores[ascensorIdx];
                 ascensor.AgregarSolicitud(solicitud);
-                MessageBox.Show($"Solicitud enviada desde el piso {pisoOrigen} al {solicitud.PisoDestino}, tipo {solicitud.Tipo}");
+                //MessageBox.Show($"Solicitud enviada al piso {solicitud.PisoDestino}, tipo {solicitud.Tipo}");
             };
             panel.Controls.Add(panelUniversal);
 
-            // 🔽 NUEVO: Paneles por edificio con botones de pausa/reanudar
+            // Paneles por edificio con botones de pausa/reanudar
             for (int i = 0; i < cantidadEdificios; i++)
             {
                 int id = i;
@@ -422,13 +379,11 @@ namespace Multi_Thread_Elevator
             btnPausar.Click += (s, e) =>
             {
                 PausarSistema();
-                sistemaPausado = true;
             };
 
             btnReanudar.Click += (s, e) =>
             {
                 IniciarSistema();
-                sistemaPausado = false;
             };
             var velocidadLabel = new Label
             {
