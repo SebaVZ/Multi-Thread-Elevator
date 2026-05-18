@@ -108,8 +108,6 @@ Multi-Thread-Elevator/
 ├── Program.cs
 ```
 
-> Note: structure may vary depending on final organization of the solution.
-
 ---
 
 ## 📚 Academic Context
