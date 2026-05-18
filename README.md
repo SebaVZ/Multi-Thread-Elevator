@@ -112,7 +112,7 @@ Multi-Thread-Elevator/
 
 ## 📚 Academic Context
 
-Developed as a university project for a **concurrent and parallel programming** course at Universidad Nacional de Costa Rica (UNA). The goal was to apply threading concepts to a real-world simulation with non-trivial synchronization requirements.
+Developed as a university project for a **operating systems** course at Universidad Nacional de Costa Rica (UNA). The goal was to apply threading concepts to a real-world simulation with non-trivial synchronization requirements.
 
 ---
 
